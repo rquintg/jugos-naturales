@@ -50,7 +50,7 @@ export function ExportButtons({ ventas, total, count, desde, hasta }: Props) {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
     const rango = desde === hasta ? `Día ${desde}` : `${desde} → ${hasta}`;
-    const title = desde === hasta && desde === new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }) ? "Corte del Día" : `Informe ${rango}`;
+    const title = `Informe ${rango}`;
 
     // Header rosa
     doc.setFillColor(236, 72, 153);

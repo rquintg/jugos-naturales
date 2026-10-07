@@ -197,8 +197,7 @@ async function HistorialContentWrapper({
       <ExportButtons ventas={ventas} total={total} count={count} desde={desde} hasta={hasta} />
 
       <p className="text-[11px] text-[#9e7a8c] leading-relaxed bg-[#fff7f9] border border-[#fecdd3] rounded-xl p-3">
-        <span className="font-bold text-[#881337]">Corte del día:</span> automático a las 00:00 GMT-5 (Bogotá). Para cierre manual, deja el rango en <span className="font-semibold">Hoy</span> y usa{" "}
-        <span className="font-semibold">Exportar PDF</span> — se genera como “Corte del Día”. También funciona como informe semanal/mensual cambiando el rango.
+        <span className="font-bold text-[#881337]">Nota:</span> El corte es automático a las 00:00 GMT-5 (Bogotá). Exportar PDF genera solo el informe del rango seleccionado.
       </p>
 
       {modo === "demo" && (
