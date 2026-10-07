@@ -10,6 +10,7 @@ import { crearVenta } from "@/app/actions";
 import { formatCOP } from "@/lib/utils";
 import { Sparkles, Info, ShoppingBag, X, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Props {
   productos: Product[];
@@ -24,10 +25,12 @@ export function PosClient({ productos, addons }: Props) {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const filtrados = categoria === "todos" ? productos : productos.filter((p) => p.categoria === categoria);
 
   const handleAdd = (p: Product): void => {
+    const wasEmpty = items.length === 0;
     addItem({
       productId: p.id,
       nombre: p.nombre,
@@ -35,12 +38,10 @@ export function PosClient({ productos, addons }: Props) {
       categoria: p.categoria,
       precioBase: p.precio_base,
     });
-    // En móvil abrir el carrito automáticamente para que quede accesible
-    // lg:hidden drawer, en desktop no molesta porque está oculto
-    setMobileOpen(true);
+    // En móvil: solo abrir automáticamente en la primera bebida para no interrumpir
+    if (wasEmpty) setMobileOpen(true);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 600);
-    // Feedback háptico suave en móvil
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       try {
         navigator.vibrate(20);
@@ -49,10 +50,15 @@ export function PosClient({ productos, addons }: Props) {
   };
 
   const handleConfirm = (): void => {
-    if (items.length === 0) return;
+    if (items.length === 0 || isPending) return;
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmVenta = (): void => {
     const payload: CartItem[] = items;
     startTransition(async () => {
       const res = await crearVenta(payload);
+      setConfirmOpen(false);
       if (res.success) {
         setMensaje(`Venta registrada: ${res.totalFormateado}`);
         clear();
@@ -61,16 +67,25 @@ export function PosClient({ productos, addons }: Props) {
         setTimeout(() => setMensaje(null), 3200);
       } else {
         setMensaje(`Error: ${res.error}`);
+        setTimeout(() => setMensaje(null), 4000);
       }
     });
   };
 
-  // Cerrar con ESC
+  // Cerrar con ESC y bloquear scroll del body cuando el drawer está abierto (POS real)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMobileOpen(false);
     };
-    if (mobileOpen) window.addEventListener("keydown", onKey);
+    if (mobileOpen) {
+      window.addEventListener("keydown", onKey);
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        document.body.style.overflow = prev;
+      };
+    }
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
@@ -93,15 +108,21 @@ export function PosClient({ productos, addons }: Props) {
       )}
 
       {/* Category tabs */}
-      <div className="flex gap-2 p-1.5 rounded-full bg-white border border-[#fecdd3] shadow-sm w-fit max-w-full overflow-x-auto scrollbar-none">
+      <div
+        role="tablist"
+        aria-label="Filtrar productos"
+        className="flex gap-2 p-1.5 rounded-full bg-white border border-[#fecdd3] shadow-sm w-fit max-w-full overflow-x-auto scrollbar-none"
+      >
         {(["todos", "sencillo", "combo"] as const).map((cat) => {
           const active = categoria === cat;
           const label = cat === "todos" ? "Todos" : cat === "sencillo" ? "Jugos sencillos" : "Combos potencia";
           return (
             <button
               key={cat}
+              role="tab"
+              aria-selected={active}
               onClick={() => setCategoria(cat)}
-              className={`px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
+              className={`px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec4899]/30 ${
                 active ? "bg-[#3a1020] text-white shadow-md" : "text-[#881337] hover:bg-[#fff1f2]"
               }`}
             >
@@ -199,7 +220,7 @@ export function PosClient({ productos, addons }: Props) {
 
       {/* Mobile: drawer bottom sheet */}
       {mobileOpen && items.length > 0 && (
-        <div className="lg:hidden fixed inset-0 z-40 flex flex-col justify-end">
+        <div className="lg:hidden fixed inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Carrito de compras">
           {/* Backdrop */}
           <button
             aria-label="Cerrar carrito"
@@ -241,6 +262,17 @@ export function PosClient({ productos, addons }: Props) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => !isPending && setConfirmOpen(false)}
+        onConfirm={handleConfirmVenta}
+        title="¿Confirmar venta?"
+        description={`Total: ${formatCOP(total)} • ${count} bebida${count > 1 ? "s" : ""}\n${items.map((i) => `${i.cantidad}× ${i.nombre} ${i.addons.length > 0 ? `+ ${i.addons.map((a) => a.nombre.replace(" (cucharada)", "").replace(" (tapa)", "")).join(", ")}` : ""}`).join("\n")}\n\nSe guardará con fecha GMT-5 Bogotá.`}
+        confirmLabel={isPending ? "Registrando..." : `Cobrar ${formatCOP(total)}`}
+        cancelLabel="Revisar"
+        isPending={isPending}
+      />
     </div>
   );
 }

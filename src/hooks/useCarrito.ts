@@ -37,7 +37,7 @@ export function useCarrito(): UseCarritoReturn {
   );
 
   const updateCantidad = useCallback((tempId: string, cantidad: number): void => {
-    if (cantidad < 1) return;
+    if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 20) return;
     setItems((prev) =>
       prev.map((i) => (i.tempId === tempId ? { ...i, cantidad } : i)),
     );
@@ -48,6 +48,7 @@ export function useCarrito(): UseCarritoReturn {
       prev.map((item) => {
         if (item.tempId !== tempId) return item;
         const exists = item.addons.some((a) => a.addonId === addon.addonId);
+        if (!exists && item.addons.length >= 5) return item;
         return {
           ...item,
           addons: exists

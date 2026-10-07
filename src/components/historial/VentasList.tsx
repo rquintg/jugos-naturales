@@ -1,7 +1,15 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { z } from "zod";
 import { formatCOP } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CupSoda } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, CupSoda, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { eliminarVenta } from "@/app/actions";
 import type { SaleItem } from "@/types";
 
 interface VentaConItems {
@@ -28,6 +36,22 @@ function groupByDay(ventas: VentaConItems[]): Map<string, VentaConItems[]> {
 }
 
 export function VentasList({ ventas, desde, hasta }: Props) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [toDelete, setToDelete] = useState<{ id: string; total: number; fecha: string } | null>(null);
+  const uuidSchema = z.string().uuid();
+
+  const handleDelete = (): void => {
+    if (!toDelete) return;
+    const parsed = uuidSchema.safeParse(toDelete.id);
+    if (!parsed.success) return;
+    startTransition(async () => {
+      const res = await eliminarVenta(toDelete.id);
+      setToDelete(null);
+      if (res.success) router.refresh();
+    });
+  };
+
   if (ventas.length === 0) {
     const rango = desde && hasta ? (desde === hasta ? `el ${desde}` : `entre ${desde} y ${hasta}`) : "hoy";
     return (
@@ -44,7 +68,12 @@ export function VentasList({ ventas, desde, hasta }: Props) {
   }
 
   const grouped = groupByDay(ventas);
-  const entries = Array.from(grouped.entries());
+  const entries = Array.from(grouped.entries()).sort((a, b) => {
+    // Ordenar días descendente (más reciente primero) en GMT-5
+    const da = new Date(a[1][0]?.created_at ?? a[0]).getTime();
+    const db = new Date(b[1][0]?.created_at ?? b[0]).getTime();
+    return db - da;
+  });
 
   return (
     <div className="space-y-6">
@@ -52,17 +81,21 @@ export function VentasList({ ventas, desde, hasta }: Props) {
         const totalDia = ventasDia.reduce((acc, v) => acc + v.total, 0);
         return (
           <div key={dia} className="space-y-3">
-            <div className="flex items-center justify-between gap-3 bg-white border border-[#fecdd3] rounded-full px-4 py-2">
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#fff1f2] to-[#ffe4e6] border border-[#fda4af] rounded-2xl px-4 py-3 shadow-[0_4px_12px_rgba(236,72,153,0.12)]">
               <h3 className="font-display font-bold text-sm text-[#3a1020] flex items-center gap-2">
-                <span className="h-6 w-6 rounded-full bg-[#fff1f2] border border-[#fecdd3] flex items-center justify-center">
-                  <Clock className="h-3 w-3 text-[#ec4899]" />
+                <span className="h-7 w-7 rounded-full bg-white border border-[#fecdd3] flex items-center justify-center shadow-sm">
+                  <Clock className="h-3.5 w-3.5 text-[#ec4899]" />
                 </span>
                 {dia}
               </h3>
-              <span className="text-xs font-semibold flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full bg-[#fff1f2] border border-[#fecdd3] text-[#881337]">{ventasDia.length} ventas</span>
-                <span className="hidden sm:inline text-[#ec4899] font-display font-bold">{formatCOP(totalDia)}</span>
-                <span className="sm:hidden text-[#ec4899] font-bold text-xs">{formatCOP(totalDia)}</span>
+              <span className="text-xs font-bold flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-full bg-white border border-[#fecdd3] text-[#881337] shadow-sm">
+                  {ventasDia.length} venta{ventasDia.length > 1 ? "s" : ""}
+                </span>
+                <span className="px-3 py-1.5 rounded-full bg-[#ec4899] text-white shadow-sm font-display hidden sm:inline">
+                  {formatCOP(totalDia)}
+                </span>
+                <span className="px-3 py-1.5 rounded-full bg-[#ec4899] text-white shadow-sm font-bold text-xs sm:hidden">{formatCOP(totalDia)}</span>
               </span>
             </div>
             <div className="grid gap-3">
@@ -77,18 +110,36 @@ export function VentasList({ ventas, desde, hasta }: Props) {
                             timeZone: "America/Bogota",
                             dateStyle: "short",
                             timeStyle: "short",
+                            hour12: false,
                           })}
                         </p>
                         <p className="font-display font-bold text-lg text-[#ec4899] leading-none mt-1">{formatCOP(venta.total)}</p>
                       </div>
-                      {(() => {
-                        const totalBebidas = venta.items.reduce((acc, it) => acc + it.cantidad, 0);
-                        return (
-                          <Badge variant="peach" className="shadow-sm">
-                            {totalBebidas} bebida{totalBebidas > 1 ? "s" : ""}
-                          </Badge>
-                        );
-                      })()}
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const totalBebidas = venta.items.reduce((acc, it) => acc + it.cantidad, 0);
+                          return (
+                            <Badge variant="peach" className="shadow-sm">
+                              {totalBebidas} bebida{totalBebidas > 1 ? "s" : ""}
+                            </Badge>
+                          );
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-full hover:bg-red-50 text-[#9e7a8c] hover:text-red-600 border border-transparent hover:border-red-200"
+                          onClick={() =>
+                            setToDelete({
+                              id: venta.id,
+                              total: venta.total,
+                              fecha: new Date(venta.created_at).toLocaleString("es-CO", { timeZone: "America/Bogota" }),
+                            })
+                          }
+                          aria-label={`Eliminar venta del ${new Date(venta.created_at).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <ul className="mt-3 divide-y divide-[#fef3c7] border-t border-[#fef3c7] rounded-xl overflow-hidden bg-[#fff7f9]/60">
                       {venta.items.map((it) => (
@@ -114,6 +165,17 @@ export function VentasList({ ventas, desde, hasta }: Props) {
           </div>
         );
       })}
+      <ConfirmDialog
+        open={!!toDelete}
+        onClose={() => !isPending && setToDelete(null)}
+        onConfirm={handleDelete}
+        title="¿Eliminar venta?"
+        description={`Se eliminará la venta del ${toDelete?.fecha ?? ""} por ${formatCOP(toDelete?.total ?? 0)}. Esta acción no se puede deshacer y restará del total del día.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="destructive"
+        isPending={isPending}
+      />
     </div>
   );
 }

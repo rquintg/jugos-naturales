@@ -12,25 +12,22 @@ interface Props {
   onAdd: (p: Product) => void;
 }
 
-const visuals: Record<string, { icon: typeof CupSoda; grad: string; emoji: string }> = {
-  "Jugo Pequeño": { icon: CupSoda, grad: "from-[#fff1f2] to-[#ffe4e6]", emoji: "🧃" },
-  "Jugo Grande": { icon: CupSoda, grad: "from-[#fef3c7] to-[#fde68a]", emoji: "🥤" },
-  Vitalidad: { icon: Zap, grad: "from-[#ecfdf5] to-[#a7f3d0]", emoji: "🌿" },
-  "Super Potencia": { icon: Zap, grad: "from-[#fef3c7] to-[#fda4af]", emoji: "⚡" },
-  Bomba: { icon: Sparkles, grad: "from-[#fce7f3] to-[#fbcfe8]", emoji: "💥" },
+const visualsByKey: Record<string, { icon: typeof CupSoda; grad: string; emoji: string }> = {
+  "sencillo-9oz": { icon: CupSoda, grad: "from-[#fff1f2] to-[#ffe4e6]", emoji: "🧃" },
+  "sencillo-14oz": { icon: CupSoda, grad: "from-[#fef3c7] to-[#fde68a]", emoji: "🥤" },
+  "combo-9oz": { icon: Zap, grad: "from-[#ecfdf5] to-[#a7f3d0]", emoji: "🌿" },
+  "combo-14oz": { icon: Zap, grad: "from-[#fef3c7] to-[#fda4af]", emoji: "⚡" },
+  "combo-16oz": { icon: Sparkles, grad: "from-[#fce7f3] to-[#fbcfe8]", emoji: "💥" },
 };
 
-function getVisual(nombre: string) {
-  if (nombre.includes("Pequeño")) return visuals["Jugo Pequeño"];
-  if (nombre.includes("Grande") && !nombre.includes("Super")) return visuals["Jugo Grande"];
-  if (nombre.includes("Vitalidad")) return visuals.Vitalidad;
-  if (nombre.includes("Super Potencia")) return visuals["Super Potencia"];
-  return visuals.Bomba;
+function getVisual(producto: Product) {
+  const key = `${producto.categoria}-${producto.tamano}` as keyof typeof visualsByKey;
+  return visualsByKey[key] ?? visualsByKey["combo-16oz"];
 }
 
 export function ProductoCard({ producto, onAdd }: Props) {
   const isCombo = producto.categoria === "combo";
-  const visual = getVisual(producto.nombre);
+  const visual = getVisual(producto);
   const Icon = visual.icon;
 
   return (

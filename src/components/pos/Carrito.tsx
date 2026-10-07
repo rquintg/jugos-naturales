@@ -64,7 +64,16 @@ export function Carrito({
             {items.length}
           </span>
         </CardTitle>
-        <Button variant="ghost" size="sm" onClick={onClear} className="h-8 rounded-full text-xs">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (items.length > 1 && !confirm("¿Vaciar carrito?")) return;
+            onClear();
+          }}
+          className="h-8 rounded-full text-xs"
+          aria-label="Vaciar carrito"
+        >
           Vaciar
         </Button>
       </CardHeader>
@@ -87,7 +96,7 @@ export function Carrito({
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-full hover:bg-red-50 text-[#9e7a8c] hover:text-red-600"
                     onClick={() => onRemove(item.tempId)}
-                    aria-label="Eliminar"
+                    aria-label={`Eliminar ${item.nombre}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -108,15 +117,18 @@ export function Carrito({
                       className="h-7 w-7 rounded-full bg-white shadow-sm border border-[#fecdd3] hover:bg-white"
                       onClick={() => onUpdateCantidad(item.tempId, item.cantidad - 1)}
                       disabled={item.cantidad <= 1}
+                      aria-label={`Disminuir cantidad de ${item.nombre}`}
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-8 text-center font-display font-bold text-sm text-[#3a1020]">{item.cantidad}</span>
+                    <span aria-live="polite" className="w-8 text-center font-display font-bold text-sm text-[#3a1020]">{item.cantidad}</span>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 rounded-full bg-[#3a1020] text-white hover:bg-[#1c0f0a] hover:text-white"
+                      className="h-7 w-7 rounded-full bg-[#3a1020] text-white hover:bg-[#1c0f0a] hover:text-white disabled:opacity-40"
                       onClick={() => onUpdateCantidad(item.tempId, item.cantidad + 1)}
+                      disabled={item.cantidad >= 20}
+                      aria-label={`Aumentar cantidad de ${item.nombre} (máx 20)`}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>

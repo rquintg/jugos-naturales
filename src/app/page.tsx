@@ -6,19 +6,17 @@ import { TotalHoy } from "@/components/pos/TotalHoy";
 import { PosClient } from "@/components/pos/PosClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Leaf } from "lucide-react";
+import { hoyRangeUTC } from "@/lib/time/bogota";
 
 async function getData() {
   await connection();
   try {
     const supabase = await createClient();
+    const { inicio, fin } = hoyRangeUTC();
     const [prodRes, addonRes, ventasHoyRes] = await Promise.all([
       supabase.from("products").select("*").eq("activo", true).order("precio_base"),
       supabase.from("addons").select("*").order("precio"),
-      supabase
-        .from("sales")
-        .select("id, total, created_at")
-        .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-        .order("created_at", { ascending: false }),
+      supabase.from("sales").select("id, total, created_at").gte("created_at", inicio).lte("created_at", fin).order("created_at", { ascending: false }),
     ]);
 
     if (prodRes.error || addonRes.error) throw prodRes.error ?? addonRes.error;

@@ -4,25 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { VentasList } from "@/components/historial/VentasList";
 import { TotalHoy } from "@/components/pos/TotalHoy";
 import { FiltroRango } from "@/components/historial/FiltroRango";
+import { ExportButtons } from "@/components/historial/ExportButtons";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCOP } from "@/lib/utils";
 import Link from "next/link";
-
-function todayISO(): string {
-  // Usar zona Bogotá para que "hoy" coincida con el corte GMT-5 usado en queries
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-}
-
-function isValidISO(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
-}
-
-function toGmtMinus5Range(desde: string, hasta: string): { inicio: string; fin: string } {
-  // Inclusive: desde 00:00:00.000 hasta 23:59:59.999 en GMT-5
-  const inicio = new Date(`${desde}T00:00:00-05:00`).toISOString();
-  const fin = new Date(`${hasta}T23:59:59.999-05:00`).toISOString();
-  return { inicio, fin };
-}
+import { todayISO, isValidISO, toGmtMinus5Range, addDaysISO, toISO } from "@/lib/time/bogota";
 
 async function getVentas(desde: string, hasta: string) {
   await connection();
@@ -47,7 +33,8 @@ async function getVentas(desde: string, hasta: string) {
       )
       .gte("created_at", inicio)
       .lte("created_at", fin)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     if (error) throw error;
     if (!ventas) return { ventas: [], total: 0, count: 0, modo: "demo" as const };
@@ -125,20 +112,14 @@ async function HistorialContentWrapper({
   const { ventas, total, count, modo } = await getVentas(desde, hasta);
   const rangoLabel = desde === hasta ? `Día ${desde}` : `${desde} → ${hasta}`;
 
-  // Etiquetas dinámicas según filtro seleccionado (Hoy / Ayer / Últimos 7 días / Este mes / Mes pasado)
+  // Etiquetas dinámicas según filtro seleccionado (Hoy / Ayer / Últimos 7 días / Este mes / Mes pasado) - GMT-5 Bogotá
   const hoyD = new Date(`${hoy}T12:00:00-05:00`);
-  const toISOFromDate = (d: Date): string => d.toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-  const addDays = (iso: string, delta: number): string => {
-    const d = new Date(`${iso}T12:00:00-05:00`);
-    d.setDate(d.getDate() + delta);
-    return toISOFromDate(d);
-  };
-  const ayer = addDays(hoy, -1);
-  const hace6 = addDays(hoy, -6);
+  const ayer = addDaysISO(hoy, -1);
+  const hace6 = addDaysISO(hoy, -6);
   const primerDiaMes = `${hoy.slice(0, 7)}-01`;
-  const ultimoDiaMes = toISOFromDate(new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0));
-  const primerDiaMesPasado = toISOFromDate(new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1));
-  const ultimoDiaMesPasado = toISOFromDate(new Date(hoyD.getFullYear(), hoyD.getMonth(), 0));
+  const ultimoDiaMes = toISO(new Date(hoyD.getFullYear(), hoyD.getMonth() + 1, 0));
+  const primerDiaMesPasado = toISO(new Date(hoyD.getFullYear(), hoyD.getMonth() - 1, 1));
+  const ultimoDiaMesPasado = toISO(new Date(hoyD.getFullYear(), hoyD.getMonth(), 0));
 
   let etiqueta = "rango";
   let labelTotal = "Total del rango";
@@ -210,8 +191,15 @@ async function HistorialContentWrapper({
         <span className="px-3 py-1.5 rounded-full bg-[#fff1f2] border border-[#fecdd3] font-semibold text-[#881337]">Rango: {rangoLabel}</span>
         <span className="px-3 py-1.5 rounded-full bg-[#3a1020] text-white font-bold">{formatCOP(total)}</span>
         <span className="px-3 py-1.5 rounded-full bg-white border border-[#fecdd3] font-semibold text-[#881337]">{count} ventas</span>
-        <span className="text-[#9e7a8c] font-medium">• Listo para tu informe semanal/mensual</span>
+        <span className="text-[#9e7a8c] font-medium">• Listo para tu informe</span>
       </div>
+
+      <ExportButtons ventas={ventas} total={total} count={count} desde={desde} hasta={hasta} />
+
+      <p className="text-[11px] text-[#9e7a8c] leading-relaxed bg-[#fff7f9] border border-[#fecdd3] rounded-xl p-3">
+        <span className="font-bold text-[#881337]">Corte del día:</span> automático a las 00:00 GMT-5 (Bogotá). Para cierre manual, deja el rango en <span className="font-semibold">Hoy</span> y usa{" "}
+        <span className="font-semibold">Exportar PDF</span> — se genera como “Corte del Día”. También funciona como informe semanal/mensual cambiando el rango.
+      </p>
 
       {modo === "demo" && (
         <Card className="bg-amber-50 border-amber-200">

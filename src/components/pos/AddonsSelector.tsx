@@ -21,6 +21,8 @@ export function AddonsSelector({ addons, selected, onToggle }: Props) {
           <button
             key={addon.id}
             type="button"
+            aria-pressed={active}
+            aria-label={`${active ? "Quitar" : "Agregar"} ${addon.nombre} por ${formatCOP(addon.precio)}`}
             onClick={() =>
               onToggle({
                 addonId: addon.id,
@@ -28,7 +30,7 @@ export function AddonsSelector({ addons, selected, onToggle }: Props) {
                 precio: addon.precio,
               })
             }
-            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec4899]/30 ${
               active
                 ? "bg-[#3a1020] text-white border-[#3a1020] shadow-md"
                 : "bg-white text-[#881337] border-[#fecdd3] hover:border-[#fda4af] hover:bg-[#fff1f2]"

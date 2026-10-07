@@ -1,50 +1,62 @@
-# Jugos Naturales 🍊 - Puesto de Ventas
+# Jugos Naturales — Puesto de Ventas
 
-App Next.js 16.4.0 + TypeScript + Tailwind + Supabase para registrar ventas de jugos y combos con adicionales, y ver total del día.
+App POS Next.js 16.4.0 + TypeScript (strict) + Tailwind + Supabase — registra ventas de jugos y combos con adicionales, total del día en **GMT-5 Bogotá** y reportes semanales/mensuales exportables.
 
-## Menú
-
-- **Sencillos:** Pequeño 9oz $4.000, Grande 14oz $5.000
-- **Combos:** Vitalidad 9oz $6.500, Super Potencia 14oz $8.500, Bomba Total 16oz $13.000
-- **Adicionales (para cualquiera):** Miel $1.000, MK $1.500, Duo MK+Miel $2.000, Vitacerebrina $3.000, Mero Macho $3.000
-- N bebidas por cliente (carrito multi-ítem)
 
 ## Stack
 
-- Next 16.4.0 `cacheComponents: true`, App Router, `src/` dir (`@/*` -> `./src/*`)
-- TypeScript estricto, Server Components por defecto, `'use client'` solo POS
-- Supabase (`/supabase/migrations/0001_schema.sql`)
+- Next 16.4.0 `cacheComponents:true` + `partialPrefetching`, App Router, `src/` (`@/*` → `./src/*`)
+- TypeScript `strict` + `allowJs:false`, Server Components por defecto, `'use client'` solo POS/historial interactivo
+- Tailwind v4 + `focus-trap-react` + `jspdf` + `zod`
+- Supabase con `server-only` y `SUPABASE_SECRET_KEY` en servidor (RLS restrictivo)
 
 ## Desarrollo
 
 ```bash
 npm run dev      # http://localhost:3000
-npm run build    # verifica Suspense + cacheComponents
+npm run build    # verifica Suspense + cacheComponents + GMT-5
 npm run lint
 ```
 
-## Supabase
+## Supabase (GMT-5)
 
 1. Crea proyecto en https://supabase.com
-2. Copia `.env.local` desde `nextjs-with-supabase/.env.local` o crea uno nuevo:
+2. Crea `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   SUPABASE_SECRET_KEY=sb_secret_... # solo servidor, no exponer
    ```
-3. Ejecuta `supabase/migrations/0001_schema.sql` en SQL Editor (crea 5 productos + 5 adicionales)
-4. Sin Supabase la app funciona en **modo demo** (usa `src/lib/data/mock.ts`, ventas no persisten pero UI funciona).
+3. Ejecuta en SQL Editor en orden:
+   - `supabase/migrations/0001_schema.sql` (5 productos + 5 adicionales)
+   - `supabase/migrations/0002_rls_fix.sql` (políticas base)
+   - `supabase/migrations/0003_venta_atomic.sql` (transacción atómica validar precios)
+   - `supabase/migrations/0004_rls_restrictivo.sql` (anon solo SELECT, INSERT vía RPC)
+4. Sin Supabase la app entra en **modo demo** (usa `src/lib/data/mock.ts`, lectura funciona, escritura muestra error rojo).
+
+## Funciones POS Real
+
+- **GMT-5 centralizado** `src/lib/time/bogota.ts` (Vercel, Supabase y browser usan `America/Bogota`)
+- **Venta atómica** `crear_venta_atomic` valida `precio_base`/`precio` en servidor, `cantidad 1-20`, `addons ≤5`, rollback si falla
+- **Doble submit** bloqueado `isPending` + validación Zod `uuid` para `eliminarVenta`
+- **Confirmaciones** rosa con `focus-trap`: al cobrar y al eliminar venta en historial
+- **Historial por rango** `?desde=&hasta=` con presets Hoy/Ayer/7d/Este mes/Mes pasado, agrupado por día `hour12:false` y ordenado desc, `limit 200`
+- **Export** `ExportButtons.tsx`: PDF (`jspdf`) y WhatsApp (`wa.me/?text=`) con detalle `cantidad× producto + addons = subtotal`, título “Corte del Día” cuando es hoy
+- **Corte:** automático 00:00 GMT-5 + manual via `Hoy → Exportar PDF`
+- **A11y:** `role=tablist`, `aria-selected`, `aria-label` Minus/Plus/Trash, `role=dialog` con `focus-trap`, `prefers-reduced-motion`
 
 ## Estructura
 
 ```
-src/app/page.tsx        # Server + Suspense -> PosClient
-src/app/historial/page.tsx
-src/app/actions.ts      # crearVenta Server Action (revalidatePath)
-src/components/pos/*    # ProductoCard, Carrito, TotalHoy
-src/lib/pricing/calculateTotal.ts # lógica pura
-src/lib/supabase/*
+src/app/page.tsx              # Server + hoyRangeUTC → PosClient
+src/app/historial/page.tsx    # Server + rango GMT-5 → VentasList + ExportButtons
+src/app/actions.ts            # crearVenta (RPC + fallback compensado) + eliminarVenta
+src/components/pos/*          # ProductoCard (categoria-tamano), Carrito, PosClient (drawer + confirm)
+src/components/historial/*    # FiltroRango, VentasList (sort + badge suma), ExportButtons
+src/lib/time/bogota.ts        # todayISO, hoyRangeUTC, toGmtMinus5Range
+src/lib/pricing/calculateTotal.ts # memoizado Intl.NumberFormat
 ```
 
 ## Reglas
 
-Ver `AGENTS.md`.
+Ver `AGENTS.md`. Diseño rosa profesional para Luisa — `bg-[#fff7f9]` / `primary #ec4899` / `prefers-reduced-motion`.

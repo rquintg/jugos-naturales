@@ -1,25 +1,17 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, ArrowLeftRight, Sparkles } from "lucide-react";
+import { todayISO, toISO, addDaysISO } from "@/lib/time/bogota";
 
 interface Props {
   desde: string;
   hasta: string;
-}
-
-function toISO(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function todayStr(): string {
-  return toISO(new Date());
 }
 
 export function FiltroRango({ desde, hasta }: Props) {
@@ -27,33 +19,25 @@ export function FiltroRango({ desde, hasta }: Props) {
   const [localDesde, setLocalDesde] = useState(desde);
   const [localHasta, setLocalHasta] = useState(hasta);
 
+  // Sincroniza inputs cuando cambia el rango desde URL (ej. presets)
   useEffect(() => {
     setLocalDesde(desde);
     setLocalHasta(hasta);
   }, [desde, hasta]);
 
   const activos = useMemo(() => {
-    const hoy = todayStr();
-    const d = new Date();
-    const ayer = (() => {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 1);
-      return toISO(x);
-    })();
-    const hace6 = (() => {
-      const x = new Date(d);
-      x.setDate(x.getDate() - 6);
-      return toISO(x);
-    })();
-    const hoyStr = hoy;
-    const primerMes = `${hoyStr.slice(0, 7)}-01`;
-    const ultimoMes = toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    const primerMesPasado = toISO(new Date(d.getFullYear(), d.getMonth() - 1, 1));
-    const ultimoMesPasado = toISO(new Date(d.getFullYear(), d.getMonth(), 0));
+    const hoy = todayISO();
+    const ayer = addDaysISO(hoy, -1);
+    const hace6 = addDaysISO(hoy, -6);
+    const hoyDTmp = new Date(`${hoy}T12:00:00-05:00`);
+    const primerMes = `${hoy.slice(0, 7)}-01`;
+    const ultimoMes = toISO(new Date(hoyDTmp.getFullYear(), hoyDTmp.getMonth() + 1, 0));
+    const primerMesPasado = toISO(new Date(hoyDTmp.getFullYear(), hoyDTmp.getMonth() - 1, 1));
+    const ultimoMesPasado = toISO(new Date(hoyDTmp.getFullYear(), hoyDTmp.getMonth(), 0));
     return {
-      hoy: desde === hoyStr && hasta === hoyStr,
+      hoy: desde === hoy && hasta === hoy,
       ayer: desde === ayer && hasta === ayer,
-      ultimos7: desde === hace6 && hasta === hoyStr,
+      ultimos7: desde === hace6 && hasta === hoy,
       esteMes: desde === primerMes && hasta === ultimoMes,
       mesPasado: desde === primerMesPasado && hasta === ultimoMesPasado,
     };
@@ -67,52 +51,45 @@ export function FiltroRango({ desde, hasta }: Props) {
   };
 
   const setHoy = (): void => {
-    const t = todayStr();
+    const t = todayISO();
     setLocalDesde(t);
     setLocalHasta(t);
     push(t, t);
   };
 
   const setAyer = (): void => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const s = toISO(d);
+    const s = addDaysISO(todayISO(), -1);
     setLocalDesde(s);
     setLocalHasta(s);
     push(s, s);
   };
 
   const set7Dias = (): void => {
-    const hastaD = new Date();
-    const desdeD = new Date();
-    desdeD.setDate(hastaD.getDate() - 6);
-    const d = toISO(desdeD);
-    const h = toISO(hastaD);
-    setLocalDesde(d);
-    setLocalHasta(h);
-    push(d, h);
+    const hoy = todayISO();
+    const hace6 = addDaysISO(hoy, -6);
+    setLocalDesde(hace6);
+    setLocalHasta(hoy);
+    push(hace6, hoy);
   };
 
   const setEsteMes = (): void => {
-    const now = new Date();
-    const desdeD = new Date(now.getFullYear(), now.getMonth(), 1);
-    const hastaD = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const d = toISO(desdeD);
-    const h = toISO(hastaD);
-    setLocalDesde(d);
-    setLocalHasta(h);
-    push(d, h);
+    const hoy = todayISO();
+    const d = new Date(`${hoy}T12:00:00-05:00`);
+    const desdeD = toISO(new Date(d.getFullYear(), d.getMonth(), 1));
+    const hastaD = toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    setLocalDesde(desdeD);
+    setLocalHasta(hastaD);
+    push(desdeD, hastaD);
   };
 
   const setMesPasado = (): void => {
-    const now = new Date();
-    const desdeD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const hastaD = new Date(now.getFullYear(), now.getMonth(), 0);
-    const d = toISO(desdeD);
-    const h = toISO(hastaD);
-    setLocalDesde(d);
-    setLocalHasta(h);
-    push(d, h);
+    const hoy = todayISO();
+    const d = new Date(`${hoy}T12:00:00-05:00`);
+    const desdeD = toISO(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+    const hastaD = toISO(new Date(d.getFullYear(), d.getMonth(), 0));
+    setLocalDesde(desdeD);
+    setLocalHasta(hastaD);
+    push(desdeD, hastaD);
   };
 
   const handleAplicar = (): void => {
